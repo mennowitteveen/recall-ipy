@@ -1,0 +1,69 @@
+<script>
+var executePython = function(pythonStr) {
+    return new Promise((resolve, reject) => {
+        const callbacks = {
+            shell: {
+                reply: data=>{
+                    // console.log(data);
+                    const status = data.content.status;
+                    if(status !== 'ok') alert(`${pythonStr}: ${JSON.stringify(data.content)}`)
+                    resolve(data);
+                }
+            }
+        };
+        Jupyter.notebook.kernel.execute(pythonStr, callbacks);    
+    });
+}
+
+var executePythonOutput = function(pythonStr) {
+    return new Promise((resolve, reject) => {
+        const callbacks = {
+            iopub: {
+                output: data=>{
+                    // console.log(data.content);
+                    resolve(data.content.data['text/plain'])
+                }
+            }
+        };
+        Jupyter.notebook.kernel.execute(pythonStr, callbacks, {silent: false});    
+    });
+}
+
+var consoleLogPythonEndpoints = function(pythonStr) {
+    const callbacks = {
+        shell: {
+            reply: data=>{
+                console.log('reply', data);
+            },
+            payload: {
+                set_next_input: data=>{
+                    console.log('data', data);
+                }
+            }
+        },
+        iopub: {
+            output: data=>{
+                console.log('output', data)
+            },
+            clear_output: data=>{
+                console.log('clear_output', data)
+            },
+        },
+        input: data=>{
+            console.log('input', data);
+        }
+    }
+    Jupyter.notebook.kernel.execute(pythonStr, callbacks, {silent: false, allow_stdin: true});
+}
+
+var executePythonOutputInNextCell = function(pythonStr) {
+    const nb = Jupyter.notebook;
+
+    nb.insert_cell_below()
+    const nbCell = nb.get_next_cell();
+    nbCell.code_mirror.doc.replaceSelection(pythonStr);
+
+    nb.select_next()
+    nb.execute_cell();
+}
+</script>

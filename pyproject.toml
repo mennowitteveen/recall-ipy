@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "recall-ipy"
+version = "0.1.0"
+description = ""
+authors = ["patarapolw <patarapolw@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "*"
+bs4 = "^0.0.1"
+mistune = "^0.8.4"
+jupyter = "^1.0"
+notebook = "^5.7"
+jinja2 = "^2.10"
+srs-format = {path = "../srs-format"}
+ipywidgets = "^7.4"
+
+[tool.poetry.dev-dependencies]

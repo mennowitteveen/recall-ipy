@@ -1,0 +1,120 @@
+<style id='srs-css'></style>
+
+<div id='srs-front' class='srs-front'></div>
+<div id='srs-back' class='srs-back'></div>
+<div id='srs-buttonArea'>
+    <button id='srs-showAnswer' type='button' class='btn btn-default srs-front'>
+        Show Answer
+    </button>
+
+    <button id='srs-wrong' type='button' class='btn btn-danger srs-back'>
+        Wrong
+    </button>
+
+    <button id='srs-right' type='button' class='btn btn-success srs-back'>
+        Right
+    </button>
+
+    <button id='srs-easy' type='button' class='btn btn-primary srs-back'>
+        Easy
+    </button>
+</div>
+
+<script id='srs-js'></script>
+
+{% include 'jupyter.js.html' %}
+
+<script>
+var cardIds = {{ cardIdsJson }};
+var currentCardIndex = 0;
+</script>
+
+<script>
+init();
+
+$('#srs-showAnswer').click(e=>{
+    $('.srs-front').hide();
+    $('.srs-back').show();
+});
+
+$('#srs-wrong').click(e=>{
+    const cardId = getCardId();
+    executePython(`srs_db.Card.get(id=${cardId}).wrong()`);
+    nextCard();
+});
+
+$('#srs-right').click(e=>{
+    const cardId = getCardId();
+    executePython(`srs_db.Card.get(id=${cardId}).right()`);
+    nextCard();
+});
+
+$('#srs-easy').click(e=>{
+    const cardId = getCardId();
+    executePython(`srs_db.Card.get(id=${cardId}).right()`);
+    executePython(`srs_db.Card.get(id=${cardId}).right()`);
+    nextCard();
+});
+
+async function init() {
+    await Promise.all([
+        executePython('from srs_format import db as srs_db'),
+        executePython('import mistune')
+    ]);
+
+    renderCard();
+}
+
+function getCardId() {
+    return cardIds[currentCardIndex];
+}
+
+async function renderCard() {
+    $('.srs-front').show();
+    $('.srs-back').hide();
+
+    const cardId = getCardId();
+
+    await executePython(`sc${cardId} = srs_db.Card.get(id=${cardId})`);
+
+    await Promise.all([
+        setElementMarkdown(`sc${cardId}.front`, '#srs-front'),
+        setElementMarkdown(`sc${cardId}.back`, '#srs-back'),
+        setElementRaw(`sc${cardId}.template.model.css`, '#srs-css'),
+        setElementRaw(`sc${cardId}.template.model.js`, '#srs-js'),
+        checkSrsLevel(cardId)
+    ]);
+    
+    executePython(`del sc${cardId}`);
+}
+
+async function setElementMarkdown(pyString, qSelector) {
+    const output = (await executePythonOutput(`mistune.markdown(${pyString})`)).replace(/\\n/g, '\n');
+    $(qSelector).html(output);
+}
+
+async function setElementRaw(pyString, qSelector) {
+    const output = await executePythonOutput(pyString);
+    $(qSelector).html(output);
+}
+
+async function checkSrsLevel(cardId) {
+    let srsLevel = parseInt(await executePythonOutput(`sc${cardId}.srs_level`));
+    if(isNaN(srsLevel)) srsLevel = -1;
+
+    if(srsLevel < 3) $('#srs-easy').attr('disabled', true);
+    else $('#srs-easy').attr('disabled', false);
+}
+
+function nextCard() {
+    if(currentCardIndex < cardIds.length - 1) {
+        currentCardIndex++;
+        renderCard();
+    } else {
+        setElementMarkdown('"## End of review"', '#srs-front');
+
+        $('.srs-front').show();
+        $('.srs-back').hide();
+    }
+}
+</script>

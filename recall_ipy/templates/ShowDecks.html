@@ -1,0 +1,129 @@
+<style>
+span {
+    display: inline-block;
+}
+
+.counter-container {
+    margin-left: 2em;
+    left: 50%;
+    display: inline-block;
+    position: absolute;
+}
+
+.counter {
+    margin-left: 1em;
+    width: 3em;
+    text-align: right;
+}
+
+.counter-due {
+    color: red;
+}
+
+.counter-remaining {
+    color: green;
+}
+</style>
+
+<ul id='showDeckArea'></ul>
+
+{% include 'shared.js.html' %}
+{% include 'jupyter.js.html' %}
+
+<script>
+var deckDict = {{ deckDict }};
+var maxDepth = {{ maxDepth }};
+</script>
+
+<script>
+init();
+
+async function init(){
+    await Promise.all([
+        executePython('from srs_format import db as srs_db'),
+        executePython('from datetime import datetime')
+    ]);
+
+    genDeck(deckDict.nodes, $('#showDeckArea'));
+}
+
+async function genDeck(nodes, $target, superDecks, current) {
+    superDecks = superDecks || [];
+    current = current || 0;
+
+    for(const node of nodes) {
+        superDecks.push(node.text);
+        const deckName = superDecks.join('::');
+        const doRecurse = ((current < maxDepth) && (node.nodes !== undefined));
+
+        const $li = $('<li>');
+
+        if (!doRecurse) {
+            const $text = $('<a href="#">')
+            $text.append(node.text);
+            $li.append($text);
+
+            checkExpandableDeck(deckName, $li);
+            getDeckStatistics(deckName, $li);
+
+            $text.click(e=>{
+                e.preventDefault();
+                openDeck(deckName);
+            });
+        } else {
+            $li.append(node.text);
+
+            const $ul = $('<ul>');
+            genDeck(node.nodes, $ul, superDecks, current+1);
+
+            $li.append($ul);
+        }
+        
+        $target.append($li);
+        superDecks.pop();
+    }
+}
+
+async function openDeck(deckName) {
+    await executePython('from recall_ipy.review import ReviewDeck');
+    executePythonOutputInNextCell(`ReviewDeck("${deckName}")`);
+}
+
+async function checkExpandableDeck(deckName, $li) {
+    const numberOfDecksStr 
+        = await executePythonOutput(`len(srs_db.Deck.select().where(srs_db.Deck.name.startswith("${deckName}")))`);
+
+    if (numberOfDecksStr !== '1') {
+        $li.prepend(' [+] ')
+    }
+}
+
+async function getDeckStatistics(deckName, $li) {
+    const deckHash = deckName.hashCode();
+
+    const $counter = $("<span class='counter-container'>");
+    const $cDue = $("<span class='counter-due counter'>");
+    const $cRemaining = $("<span class='counter-remaining counter'>");
+
+    $counter.append($cDue);
+    $counter.append($cRemaining);
+
+    await executePython(`q_${deckHash} = srs_db.Card.select()` + 
+    `.join(srs_db.CardDeck).join(srs_db.Deck).where(srs_db.Deck.name.startswith("${deckName}"))` +
+    '.switch(srs_db.Card)')
+
+    executePythonOutput(`q_${deckHash}.where(srs_db.Card.next_review < datetime.now()).count()`)
+        .then(dueStr=>{
+            $cDue.text(dueStr);
+        })
+
+    executePythonOutput(`q_${deckHash}.where(srs_db.Card.next_review.is_null(True)).count()`)
+        .then(remainingStr=>{
+            $cRemaining.text(remainingStr);
+        })
+    
+    executePython(`del q_${deckHash}`)
+
+    $li.append($counter);
+}
+</script>
