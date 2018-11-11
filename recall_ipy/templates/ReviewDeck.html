@@ -51,8 +51,7 @@ $('#srs-right').click(e=>{
 
 $('#srs-easy').click(e=>{
     const cardId = getCardId();
-    executePython(`srs_db.Card.get(id=${cardId}).right()`);
-    executePython(`srs_db.Card.get(id=${cardId}).right()`);
+    executePython(`srs_db.Card.get(id=${cardId}).easy()`);
     nextCard();
 });
 
@@ -102,8 +101,8 @@ async function checkSrsLevel(cardId) {
     let srsLevel = parseInt(await executePythonOutput(`sc${cardId}.srs_level`));
     if(isNaN(srsLevel)) srsLevel = -1;
 
-    if(srsLevel < 3) $('#srs-easy').attr('disabled', true);
-    else $('#srs-easy').attr('disabled', false);
+    if(srsLevel < 3) $('#srs-easy').attr('disabled', false);
+    else $('#srs-easy').attr('disabled', true);
 }
 
 function nextCard() {
@@ -115,6 +114,7 @@ function nextCard() {
 
         $('.srs-front').show();
         $('.srs-back').hide();
+        $('#srs-showAnswer').hide();
     }
 }
 </script>

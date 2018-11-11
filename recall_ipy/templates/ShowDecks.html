@@ -85,8 +85,11 @@ async function genDeck(nodes, $target, superDecks, current) {
 }
 
 async function openDeck(deckName) {
-    await executePython('from recall_ipy.review import ReviewDeck');
-    executePythonOutputInNextCell(`ReviewDeck("${deckName}")`);
+    executePythonOutputInNextCell(`
+        from recall_ipy.review import ReviewDeck
+        review_deck = ReviewDeck("${deckName}")
+        review_deck
+    `);
 }
 
 async function checkExpandableDeck(deckName, $li) {

@@ -57,13 +57,36 @@ var consoleLogPythonEndpoints = function(pythonStr) {
 }
 
 var executePythonOutputInNextCell = function(pythonStr) {
+    let rows = [];
+    let indents = [];
+    for(const row of pythonStr.split('\n')) {
+        if(row.trim()) {
+            rows.push(row);
+            indents.push(row.match(/^ */).toString().length);
+        }
+    }
+
+    const minIndent = Math.min(...indents);
+
+    rows.forEach((row, i)=>{
+        rows[i] = row.slice(minIndent);
+    });
+
+    const cleanPythonStr = rows.join('\n');
+
     const nb = Jupyter.notebook;
+    let nbIndex = nb.get_anchor_index();
+    let nbCell = nb.get_cell(nbIndex);
 
-    nb.insert_cell_below()
-    const nbCell = nb.get_next_cell();
-    nbCell.code_mirror.doc.replaceSelection(pythonStr);
+    if(nbCell.code_mirror.doc.getValue()){
+        nb.insert_cell_below();
+        nbIndex++;
+        nbCell = nb.get_cell(nbIndex);
+    }
 
-    nb.select_next()
-    nb.execute_cell();
+    nbCell.code_mirror.doc.replaceSelection(cleanPythonStr);
+
+    nb.select(nbIndex);
+    // nb.execute_cell();
 }
 </script>
