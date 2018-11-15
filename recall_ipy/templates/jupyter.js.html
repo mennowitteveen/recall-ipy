@@ -75,18 +75,15 @@ var executePythonOutputInNextCell = function(pythonStr) {
     const cleanPythonStr = rows.join('\n');
 
     const nb = Jupyter.notebook;
-    let nbIndex = nb.get_anchor_index();
-    let nbCell = nb.get_cell(nbIndex);
+    let nbCell = nb.get_next_cell();
 
     if(nbCell.code_mirror.doc.getValue()){
-        nb.insert_cell_below();
-        nbIndex++;
-        nbCell = nb.get_cell(nbIndex);
+        nbCell = nb.insert_cell_above();
     }
 
     nbCell.code_mirror.doc.replaceSelection(cleanPythonStr);
 
-    nb.select(nbIndex);
+    nb.select(nb.find_cell_index(nbCell));
     // nb.execute_cell();
 }
 </script>

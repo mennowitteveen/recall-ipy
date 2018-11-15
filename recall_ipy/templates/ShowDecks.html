@@ -23,6 +23,12 @@ span {
 .counter-remaining {
     color: green;
 }
+
+.link {
+    color: blue;
+    text-decoration: underline;
+    display: inline-block;
+}
 </style>
 
 <ul id='showDeckArea'></ul>
@@ -33,6 +39,7 @@ span {
 <script>
 var deckDict = {{ deckDict }};
 var maxDepth = {{ maxDepth }};
+var filter = "{{ filter }}";
 </script>
 
 <script>
@@ -40,8 +47,9 @@ init();
 
 async function init(){
     await Promise.all([
-        executePython('from srs_format import db as srs_db'),
-        executePython('from datetime import datetime')
+        executePython('from srs_format import api as srs_api'),
+        executePython('from datetime import datetime'),
+        executePython('import json')
     ]);
 
     genDeck(deckDict.nodes, $('#showDeckArea'));
@@ -59,7 +67,7 @@ async function genDeck(nodes, $target, superDecks, current) {
         const $li = $('<li>');
 
         if (!doRecurse) {
-            const $text = $('<a href="#">')
+            const $text = $('<div class="link">')
             $text.append(node.text);
             $li.append($text);
 
@@ -84,26 +92,26 @@ async function genDeck(nodes, $target, superDecks, current) {
     }
 }
 
-async function openDeck(deckName) {
-    executePythonOutputInNextCell(`
-        from recall_ipy.review import ReviewDeck
-        review_deck = ReviewDeck("${deckName}")
-        review_deck
-    `);
+function openDeck(deckName) {
+    setTimeout(()=>{
+        executePythonOutputInNextCell(`
+            from recall_ipy.review import ReviewDeck
+            review_deck = ReviewDeck("${deckName}", filter_="${filter}")
+            review_deck
+        `)
+    }, 100);
 }
 
 async function checkExpandableDeck(deckName, $li) {
     const numberOfDecksStr 
-        = await executePythonOutput(`len(srs_db.Deck.select().where(srs_db.Deck.name.startswith("${deckName}")))`);
+        = await executePythonOutput(`srs_api.has_sub_deck("${deckName}")`);
 
-    if (numberOfDecksStr !== '1') {
-        $li.prepend(' [+] ')
+    if (numberOfDecksStr === 'True') {
+        $li.prepend(' [<div class="link">+</div>] ')
     }
 }
 
 async function getDeckStatistics(deckName, $li) {
-    const deckHash = deckName.hashCode();
-
     const $counter = $("<span class='counter-container'>");
     const $cDue = $("<span class='counter-due counter'>");
     const $cRemaining = $("<span class='counter-remaining counter'>");
@@ -111,21 +119,9 @@ async function getDeckStatistics(deckName, $li) {
     $counter.append($cDue);
     $counter.append($cRemaining);
 
-    await executePython(`q_${deckHash} = srs_db.Card.select()` + 
-    `.join(srs_db.CardDeck).join(srs_db.Deck).where(srs_db.Deck.name.startswith("${deckName}"))` +
-    '.switch(srs_db.Card)')
-
-    executePythonOutput(`q_${deckHash}.where(srs_db.Card.next_review < datetime.now()).count()`)
-        .then(dueStr=>{
-            $cDue.text(dueStr);
-        })
-
-    executePythonOutput(`q_${deckHash}.where(srs_db.Card.next_review.is_null(True)).count()`)
-        .then(remainingStr=>{
-            $cRemaining.text(remainingStr);
-        })
-    
-    executePython(`del q_${deckHash}`)
+    const deckStat = JSON.parse((await executePythonOutput(`json.dumps(srs_api.get_deck_stat("${deckName}", filter_="${filter}"))`)).slice(1, -1));
+    $cDue.text(deckStat.due);
+    $cRemaining.text(deckStat.remaining);
 
     $li.append($counter);
 }
